@@ -27,6 +27,7 @@ Recent: inbox dreemz-backend tasks
 - **Default project** - Your main project always at top (configurable)
 - **Recent projects** - Shows last 3 projects in header
 - **Fuzzy search** - Type to filter projects
+- **Create new folders** - Type a name that doesn't exist → creates it and starts Claude
 - **Preview pane** - See folder contents before selecting
 - **Handles spaces** - Works with folder names like "My Project" or "פרויקט שלי"
 - **Smart skipping** - Doesn't run inside VS Code or nested Claude sessions
@@ -130,6 +131,7 @@ Delete this file to reset usage history.
 | `Enter` | Select project & launch Claude |
 | `ESC` or `Ctrl+C` | Cancel (stay in ~) |
 | Type anything | Filter projects |
+| Type new name + `Enter` | Create folder & launch Claude |
 
 ## Disable Temporarily
 
