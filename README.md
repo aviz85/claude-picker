@@ -39,35 +39,49 @@ Recent: inbox dreemz-backend tasks
 
 ## Installation
 
-### 1. Install fzf (if not already installed)
+### Recommended: Use Claude Code
 
+The easiest way to install - just ask Claude Code to do it:
+
+```
+claude "Install claude-picker from github.com/aviz85/claude-picker"
+```
+
+Claude will download the script, install fzf if needed, and configure your shell.
+
+### One-liner Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aviz85/claude-picker/main/install.sh | bash
+```
+
+### Manual Install
+
+1. **Install fzf:**
 ```bash
 brew install fzf
 ```
 
-### 2. Download claude-picker
-
+2. **Download claude-picker:**
 ```bash
 mkdir -p ~/bin
 curl -o ~/bin/claude-picker.sh https://raw.githubusercontent.com/aviz85/claude-picker/main/claude-picker.sh
 chmod +x ~/bin/claude-picker.sh
 ```
 
-### 3. Add to your shell profile
+3. **Add to your shell profile:**
 
-**For bash** (add to `~/.bash_profile`):
+For bash (`~/.bash_profile`):
 ```bash
 echo 'source ~/bin/claude-picker.sh' >> ~/.bash_profile
 ```
 
-**For zsh** (add to `~/.zshrc`):
+For zsh (`~/.zshrc`):
 ```bash
 echo 'source ~/bin/claude-picker.sh' >> ~/.zshrc
 ```
 
-### 4. Open a new terminal
-
-That's it! Open a new terminal window to see the picker.
+4. **Open a new terminal** - that's it!
 
 ## Configuration
 
