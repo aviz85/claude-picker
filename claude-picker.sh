@@ -99,48 +99,37 @@ claude_picker() {
         echo -e "\033[1;36m📂 Select project folder (sorted by usage)\033[0m"
         [[ -n "$recent" ]] && echo -e "\033[0;90mRecent: $recent\033[0m"
 
-        # Use --print-query to capture typed text for create-new-folder feature
-        local result=$(get_sorted_projects | \
-            fzf --height=40% --reverse --border \
-                --prompt="Project: " \
-                --header="Type to filter, Enter to select, or type new name" \
-                --preview="ls -la $HOME/{} 2>/dev/null | head -20" \
-                --preview-window=right:50% \
-                --print-query)
+        # Write project list to temp file for reload access
+        local projects_file=$(mktemp)
+        get_sorted_projects > "$projects_file"
 
-        # Parse result: first line is query, second line is selection
-        local query=$(echo "$result" | head -1)
-        local selected=$(echo "$result" | tail -1)
+        # fzf with dynamic "Create" option at bottom
+        # Reload: show filtered projects + "Create" option (unless exact match exists)
+        local selected=$(fzf --height=40% --reverse --border \
+            --prompt="Project: " \
+            --header="Type to filter, ↓ to create new" \
+            --preview="[[ '{}' == '➕ Create:'* ]] && echo '📁 New folder will be created' || ls -la $HOME/{} 2>/dev/null | head -20" \
+            --preview-window=right:50% \
+            --bind "start:reload(cat $projects_file)" \
+            --bind "change:reload(cat $projects_file | grep -i {q} || true; [[ -n {q} ]] && ! grep -qix {q} $projects_file && echo '➕ Create: {q}')" \
+            < /dev/null)
 
-        # If selected equals query, user pressed Enter on typed text (no match selected)
-        if [[ -n "$selected" && "$selected" != "$query" ]]; then
-            # User selected an existing folder
+        rm -f "$projects_file"
+
+        # Handle selection
+        if [[ "$selected" == "➕ Create: "* ]]; then
+            local new_folder="${selected#➕ Create: }"
+            echo -e "\033[1;35m📁 Creating: $new_folder\033[0m"
+            mkdir -p "$HOME/$new_folder"
+            update_usage "$new_folder"
+            cd "$HOME/$new_folder"
+            echo -e "\033[1;32m→ $new_folder\033[0m"
+            cld
+        elif [[ -n "$selected" ]]; then
             update_usage "$selected"
             cd "$HOME/$selected"
             echo -e "\033[1;32m→ $selected\033[0m"
             cld
-        elif [[ -n "$query" ]]; then
-            # User typed something - check if folder exists
-            if [[ -d "$HOME/$query" ]]; then
-                # Exact match exists
-                update_usage "$query"
-                cd "$HOME/$query"
-                echo -e "\033[1;32m→ $query\033[0m"
-                cld
-            else
-                # Folder doesn't exist - offer to create
-                echo -e "\033[1;33mFolder '$query' doesn't exist.\033[0m"
-                read -p "Create it? (y/N): " confirm
-                if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                    mkdir -p "$HOME/$query"
-                    update_usage "$query"
-                    cd "$HOME/$query"
-                    echo -e "\033[1;32m→ $query (created)\033[0m"
-                    cld
-                else
-                    echo -e "\033[1;33mStaying in ~\033[0m"
-                fi
-            fi
         else
             echo -e "\033[1;33mStaying in ~\033[0m"
         fi
