@@ -24,12 +24,8 @@ init_usage_file() {
     fi
 }
 
-# Get projects sorted by usage count (descending)
-# sb is ALWAYS first (default project), then others by usage
-get_sorted_projects() {
-    # sb first (if exists)
-    [[ -d "$HOME/sb" ]] && echo "sb"
-
+# Get projects sorted by usage count (descending) - WITHOUT sb
+get_other_projects() {
     # Flatten JSON for reliable parsing
     local usage_data=$(cat "$USAGE_FILE" 2>/dev/null | tr -d '\n\r\t ')
 
@@ -44,6 +40,41 @@ get_sorted_projects() {
     done
     sort -rn "$tmp_file" | cut -f2-
     rm -f "$tmp_file"
+}
+
+# Build sectioned list: sb | separator | projects | separator | create
+# Args: $1 = query (optional), $2 = projects_file
+build_picker_list() {
+    local query="$1"
+    local projects_file="$2"
+
+    # Section 1: sb (always first, if matches query or no query)
+    if [[ -d "$HOME/sb" ]]; then
+        if [[ -z "$query" ]] || echo "sb" | grep -qi "$query"; then
+            echo "sb"
+        fi
+    fi
+
+    # Separator after sb section
+    echo "──────────────────────────"
+
+    # Section 2: Other projects (filtered)
+    if [[ -z "$query" ]]; then
+        cat "$projects_file"
+    else
+        grep -i "$query" "$projects_file" || true
+    fi
+
+    # Separator before create section
+    echo "──────────────────────────"
+
+    # Section 3: Create option (only if query exists and doesn't match exactly)
+    if [[ -n "$query" ]]; then
+        # Check if exact match exists (sb or other project)
+        if [[ "$query" != "sb" ]] && ! grep -qix "$query" "$projects_file"; then
+            echo "➕ Create: $query"
+        fi
+    fi
 }
 
 # Update usage count for selected project
@@ -99,25 +130,35 @@ claude_picker() {
         echo -e "\033[1;36m📂 Select project folder (sorted by usage)\033[0m"
         [[ -n "$recent" ]] && echo -e "\033[0;90mRecent: $recent\033[0m"
 
-        # Write project list to temp file for reload access
+        # Write project list to temp file (without sb)
         local projects_file=$(mktemp)
-        get_sorted_projects > "$projects_file"
+        get_other_projects > "$projects_file"
 
-        # fzf with dynamic "Create" option at bottom
-        # Reload: show filtered projects + "Create" option (unless exact match exists)
-        local selected=$(fzf --height=40% --reverse --border \
+        # Build initial list with sections
+        local initial_list=$(mktemp)
+        build_picker_list "" "$projects_file" > "$initial_list"
+
+        # fzf with sectioned layout
+        local selected=$(cat "$initial_list" | fzf --height=40% --reverse --border \
             --prompt="Project: " \
-            --header="Type to filter, ↓ to create new" \
-            --preview="[[ '{}' == '➕ Create:'* ]] && echo '📁 New folder will be created' || ls -la $HOME/{} 2>/dev/null | head -20" \
+            --header="sb=default | ↓ to create new" \
+            --preview="[[ '{}' == '➕ Create:'* ]] && echo '📁 New folder will be created' || [[ '{}' == '───'* ]] && echo '' || ls -la $HOME/{} 2>/dev/null | head -20" \
             --preview-window=right:50% \
-            --bind "start:reload(cat $projects_file)" \
-            --bind "change:reload(cat $projects_file | grep -i {q} || true; [[ -n {q} ]] && ! grep -qix {q} $projects_file && echo '➕ Create: {q}')" \
-            < /dev/null)
+            --bind "change:reload(
+                q={q};
+                if [[ -d $HOME/sb ]] && { [[ -z \$q ]] || echo sb | grep -qi \$q; }; then echo sb; fi;
+                echo '──────────────────────────';
+                if [[ -z \$q ]]; then cat $projects_file; else grep -i \$q $projects_file || true; fi;
+                echo '──────────────────────────';
+                if [[ -n \$q ]] && [[ \$q != 'sb' ]] && ! grep -qix \$q $projects_file; then echo \"➕ Create: \$q\"; fi
+            )")
 
-        rm -f "$projects_file"
+        rm -f "$projects_file" "$initial_list"
 
-        # Handle selection
-        if [[ "$selected" == "➕ Create: "* ]]; then
+        # Handle selection (skip separators)
+        if [[ "$selected" == "───"* ]]; then
+            echo -e "\033[1;33mStaying in ~\033[0m"
+        elif [[ "$selected" == "➕ Create: "* ]]; then
             local new_folder="${selected#➕ Create: }"
             echo -e "\033[1;35m📁 Creating: $new_folder\033[0m"
             mkdir -p "$HOME/$new_folder"
